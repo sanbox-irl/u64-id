@@ -1,0 +1,16 @@
+[package]
+name = "u64-id"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jonathan Spira <jjspira@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sanbox-irl/u64-id"
+description = "A tiny library providing a u64 backed id."
+categories = ["game-development"]
+
+[dependencies]
+rand = { version = "0.8.5", optional = true }
+serde = { version = "1.0.198", features = ["derive"], optional = true }
+
+[features]
+default = ["rand", "serde"]

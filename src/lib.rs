@@ -1,6 +1,6 @@
 use core::fmt;
 
-/// An ID for Assets. Currently, it is implemented as a wrapper around [`u64`]s.
+/// An ID for simply applications, implemented as a wrapper around [`u64`]s.
 ///
 /// ## Valid Range
 ///

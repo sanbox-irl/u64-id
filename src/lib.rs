@@ -1,43 +1,46 @@
 use core::fmt;
 
-/// An ID for Assets. Currently, it is implemented as a wrapper around u64s.
-/// If a collision occurs in your own code, please file an issue -- this will
-/// likely require several billion assets for that to happen though.
+/// An ID for Assets. Currently, it is implemented as a wrapper around [`u64`]s.
+///
+/// ## Valid Range
+///
+/// The valid range of ids is given by [`U64Id::VALID_RANGE`]. Essentially,
+/// this range is `..(u64::MAX - 128)`.
+///
+/// ## Collisions
+///
+/// Ids are made entirely randomly, so a collision is possible, but unbelievably
+/// unlikely, since just a simply u64 has enough bitspace in it to prevent a collision.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[repr(transparent)]
-pub struct U64Id(u64);
+pub struct U64Id(pub u64);
 
 impl U64Id {
-    /// Returns the forbidden `null` id.
-    pub const NULL: U64Id = U64Id(0);
+    /// Returns the forbidden `null` id. Applications can use this as an Id
+    /// which will never be made.
+    pub const NULL: U64Id = U64Id(u64::MAX);
+
+    /// Returns the valid range for [`U64Id`]s. Nothing prevents an Id from
+    /// being generated outside of this range, so it should not be relied upon
+    /// for safety.
+    ///
+    /// The amount of space at the top was randomly determined to be useful.
+    pub const VALID_RANGE: core::ops::Range<u64> = 0..(u64::MAX - 128);
 
     /// Creates a new, random AssetId, seeded cheaply from thread_rng.
     ///
-    /// To avoid calling this internal function repeatedly, consider using [id]
-    /// and directly constructing your own rng handler.
-    ///
-    /// Internally, we use a u64 for random numbers. These have been, generally,
-    /// large enough.
+    /// To avoid calling this internal function repeatedly, consider making
+    /// a `U64Id` directly.
     #[cfg(feature = "rand")]
     pub fn new() -> Self {
         use rand::Rng;
 
-        Self(rand::thread_rng().gen())
-    }
-
-    /// Creates a new AssetId with the given Id.
-    pub const fn id(id: u64) -> Self {
-        Self(id)
+        Self(rand::rng().random_range(Self::VALID_RANGE))
     }
 
     /// Checks if the asset is the `null` ID.
     pub const fn is_null(self) -> bool {
-        self.0 == 0
-    }
-
-    /// Returns the inner value.
-    pub const fn inner(self) -> u64 {
-        self.0
+        self.0 == u64::MAX
     }
 }
 
@@ -50,7 +53,7 @@ impl Default for U64Id {
 
 impl fmt::Display for U64Id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "*{:x}", self.0)
+        write!(f, "{:x}", self.0)
     }
 }
 impl fmt::LowerHex for U64Id {
@@ -111,8 +114,67 @@ impl<'de> serde::Deserialize<'de> for U64Id {
                     serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
                 })
             }
+
+            // we can also deserialize an i64! This can be nice. Yes. It is nice.
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                u64::from_str_radix(&v.to_string(), 16).map_err(|_| {
+                    serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                })
+            }
         }
 
-        deserializer.deserialize_str(AssetIdVisitor).map(U64Id)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_any(AssetIdVisitor).map(U64Id)
+        } else {
+            deserializer.deserialize_str(AssetIdVisitor).map(U64Id)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_tests() {
+        let asset = U64Id::NULL;
+        assert!(asset.is_null());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn basic_serde() {
+        assert_eq!(
+            serde_json::from_str::<U64Id>("12345").unwrap(),
+            U64Id(74565)
+        );
+
+        assert_eq!(
+            serde_json::from_str::<U64Id>("\"a12b345\"").unwrap(),
+            U64Id(168997701)
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_cycle() {
+        let input = "\"123454321\"";
+        let output = serde_json::from_str::<U64Id>(input).unwrap();
+        let input_again = serde_json::to_string(&output).unwrap();
+
+        assert_eq!(input, input_again);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_cycle_around() {
+        let input = U64Id(12345321);
+        let output = serde_json::to_string::<U64Id>(&input).unwrap();
+        let input_again = serde_json::from_str(&output).unwrap();
+
+        assert_eq!(input, input_again);
     }
 }

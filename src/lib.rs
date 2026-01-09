@@ -71,6 +71,14 @@ impl fmt::UpperHex for U64Id {
     }
 }
 
+impl std::str::FromStr for U64Id {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u64::from_str_radix(s, 16).map(Self)
+    }
+}
+
 #[cfg(feature = "serde")]
 impl serde::Serialize for U64Id {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

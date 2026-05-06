@@ -28,14 +28,9 @@ impl U64Id {
     pub const VALID_RANGE: core::ops::Range<u64> = 0..(u64::MAX - 128);
 
     /// Creates a new, random AssetId, seeded cheaply from thread_rng.
-    ///
-    /// To avoid calling this internal function repeatedly, consider making
-    /// a `U64Id` directly.
     #[cfg(feature = "rand")]
     pub fn new() -> Self {
-        use rand::Rng;
-
-        Self(rand::rng().random_range(Self::VALID_RANGE))
+        Self(rand::random_range(Self::VALID_RANGE))
     }
 
     /// Checks if the asset is the `null` ID.
@@ -150,6 +145,9 @@ mod tests {
     fn null_tests() {
         let asset = U64Id::NULL;
         assert!(asset.is_null());
+
+        let asset = U64Id(123456);
+        assert!(!asset.is_null());
     }
 
     #[cfg(feature = "serde")]
